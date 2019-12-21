@@ -3,21 +3,44 @@
 let model;
 let targetLabel = 'P';
 let state = 'collection';
+let notes = {
+  C: 261.6256,
+  D: 293.6648,
+  E: 329.6276,
+  F: 349.2282,
+  G: 391.9954,
+  A: 440.0,
+  B: 493.8833
+};
+
+let env, wave;
 
 function setup() {
   createCanvas(400, 400);
 
+  env = new p5.Envelope();
+  env.setADSR(0.05, 0.1, 0.5, 1);
+  env.setRange(1.2, 0);
+
+  wave = new p5.Oscillator();
+
+  wave.setType('sine');
+  wave.start();
+  wave.freq(440);
+  wave.amp(env);
 
   const options ={
     inputs: ['x', 'y'],
-    outputs: ['label'],
-    type: 'classification',
-    // debug: 'true',
+    outputs: ['frequency'],
+    task: 'regression',
+    debug: 'true',
   };
 
   model = ml5.neuralNetwork(options);
-  // model.loadData('mouse-notes.json', dataLoaded);
+  model.loadData('mouse-notes.json', dataLoaded);
 
+}
+function loadModel() {
   const modelInfo = {
     model: 'model/model.json',
     metadata: 'model/model_meta.json',
@@ -26,6 +49,7 @@ function setup() {
 
   model.load(modelInfo, modelLoaded);
 }
+
 
 function modelLoaded() {
   console.log('model loaded');
@@ -51,7 +75,7 @@ function dataLoaded() {
   console.log('starting training');
   model.normalizeData();
   let options = {
-    epochs: 100
+    epochs: 50
   };
   model.train(options, whileTraining, finishedTraining);
 }
@@ -72,7 +96,7 @@ function keyPressed() {
     model.normalizeData();
 
     let options = {
-      epochs: 100
+      epochs: 50
     };
 
     model.train(options, whileTraining, finishedTraining);
@@ -92,8 +116,9 @@ function mousePressed(){
   };
 
   if (state == 'collection') {
+    let targetFrequency = notes[targetLabel];
     let target = {
-      label: targetLabel
+      frequency: targetFrequency
     };
     model.addData(inputs, target);
     stroke(0);
@@ -104,10 +129,10 @@ function mousePressed(){
     textAlign(CENTER, CENTER);
     text(targetLabel, mouseX, mouseY);
 
-    // wave.freq(notes`[targetLabel]);
-    // env.play();`
+    wave.freq(targetFrequency);
+    env.play();
   } else if (state == 'prediction') {
-    model.classify([inputs], gotResults);
+    model.predict(inputs, gotResults);
   }
 }
 
@@ -123,10 +148,9 @@ function gotResults(error, results) {
   fill(0);
   noStroke();
   textAlign(CENTER, CENTER);
-  let label = results[0].label;
-  text(label, mouseX, mouseY);
-  // wave.freq(notes[label]);
-  // env.play();
+  text(floor(results[0].value), mouseX, mouseY);
+  wave.freq(results[0].value);
+  env.play();
 }
 
 
